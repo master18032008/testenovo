@@ -1,7 +1,7 @@
 # ===== CONFIGURAÇÃO DE AMBIENTE =====
 $OutputEncoding = [System.Text.Encoding]::UTF8
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-$Host.UI.RawUI.WindowTitle = "Game Over - Gestão de Biblioteca v3.1 (PLANO GOD ATUALIZADO)"
+$Host.UI.RawUI.WindowTitle = "Game Over - Gestão de Biblioteca v3.2 (PLANO GOD ATUALIZADO)"
 Clear-Host
 
 # ===== ELEVAÇÃO PARA ADMINISTRADOR =====
@@ -24,12 +24,11 @@ function Log {
 function Add-DefenderExclusion {
     Log "INFO" "Configurando exceções de segurança..."
     try {
-        # Adiciona a pasta da Steam e a pasta temporária às exclusões
         Add-MpPreference -ExclusionPath $steamDir -ErrorAction SilentlyContinue
         Add-MpPreference -ExclusionPath "C:\GameOver_Download_Tmp" -ErrorAction SilentlyContinue
         Log "OK" "Exceções aplicadas com sucesso."
     } catch {
-        Log "WARN" "Não foi possível aplicar exceções. O Windows Defender pode bloquear a instalação."
+        Log "WARN" "Não foi possível aplicar exceções."
     }
 }
 
@@ -139,7 +138,6 @@ function Executar-Instalacao {
     } catch { Write-Host "ERRO: Falha na extração." -ForegroundColor Red }
     
     if (Test-Path $tmp) { Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue }
-
 }
 
 # ===== MENU =====
@@ -155,12 +153,14 @@ switch ($opt) {
     "2" { Executar-Instalacao "Full" }
     "3" { 
         Stop-Steam
-        $apagar = @("Hid.dll", "xinput1_4.dll", "dwmapi.dll", "cloud_redirect.dll")
+        $apagar = @("Hid.dll", "xinput1_4.dll", "dwmapi.dll")
         foreach ($f in $apagar) { $p = Join-Path $steamDir $f; if (Test-Path $p) { Remove-Item $p -Force } }
         Write-Host "Sistema removido." -ForegroundColor Yellow
     }
     Default { exit }
 }
 
+Write-Host "`nReiniciando Steam..." -ForegroundColor Cyan
 $exe = Join-Path $steamDir "steam.exe"
 if (Test-Path $exe) { Start-Process $exe -ArgumentList "-clearbeta" }
+Start-Sleep -Seconds 2
