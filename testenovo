@@ -1,7 +1,7 @@
 # ===== CONFIGURAÇÃO DE AMBIENTE E CODIFICAÇÃO =====
 $OutputEncoding = [System.Text.Encoding]::UTF8
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-$Host.UI.RawUI.WindowTitle = "Game Over - Gestão de Biblioteca v3.0 (PLANO GOD - NOVO LINK)"
+$Host.UI.RawUI.WindowTitle = "Game Over - Gestão de Biblioteca v3.0 (PLANO GOD - ATUALIZADO)"
 Clear-Host
 
 if ($host.Name -eq 'ConsoleHost') {
@@ -81,14 +81,16 @@ function Executar-Instalacao {
     $nomeArquivo = Join-Path $tmp "PlanoGod.zip"
     $urlDoZip = "https://www.dropbox.com/scl/fi/vo1by3m2orte0ynfhvc00/GameOverGod.zip?rlkey=wjskcjlwlbi5a2m9x9g38u4q2&st=wtgdc5na&dl=1"
     
-    # Link do MediaFire para as novas DLLs
-    $urlDLLs = "https://download1640.mediafire.com/4cvoewb54crgR7c94D6o8WvyiHmAQc7R2dRoXvuHzZ50dEM9JlRo42uH4Bh8ZKhYmvSJKrDPzinvg8eDnXRH95a51s2CfvK_lhAurM1eejCNpBgXbL3uF_rLlZze7VD53Xvldd8CalCPGoDlIIfnVlN9cfmPHQqWeX_ZhJagKvz3/xxv4nf0k7ptnu4t/Pack.zip"
     $zipDlls = Join-Path $tmp "Pack.zip"
+    $urlDLLs = "https://download1640.mediafire.com/ic1r02ssfaeg7EhBhyFNsKIDHU3Bm3Yd5QwLquOqeYXBD-JSs7ioEPzLLCHehjo2TT2Gy3dp2i7pVmOqmku4xzx61ZzO9_fIV-ILFNxdCjL_W8TC7IAelj3HHneMLCFG8bDnQf5TsrMHYKrWNWkLJLllMTmHisXLfddflMOLv5h2/xxv4nf0k7ptnu4t/Pack.zip"
     
     Write-Host "Baixando arquivos da biblioteca..." -ForegroundColor Cyan
     try {
-        Invoke-WebRequest -Uri $urlDoZip -OutFile $nomeArquivo -ErrorAction Stop
-        Invoke-WebRequest -Uri $urlDLLs -OutFile $zipDlls -ErrorAction Stop
+        Invoke-WebRequest -Uri $urlDoZip -OutFile $nomeArquivo -UseBasicParsing -ErrorAction Stop
+        Invoke-WebRequest -Uri $urlDLLs -OutFile $zipDlls -UseBasicParsing -ErrorAction Stop
+        
+        # Espera o arquivo ser liberado
+        Start-Sleep -Seconds 3
         Write-Host "Download concluido com sucesso!" -ForegroundColor Green
     } catch {
         Write-Host "ERRO: Falha no download. Verifique os links." -ForegroundColor Red
@@ -97,12 +99,15 @@ function Executar-Instalacao {
     }
     
     Write-Host "Sincronizando DLLs de sistema..." -ForegroundColor Cyan
-    $tmpDlls = Join-Path $tmp "ExtraidoDLLs"
-    Expand-Archive -Path $zipDlls -DestinationPath $tmpDlls -Force
-    
-    # Copia apenas arquivos .dll para a raiz da Steam
-    Get-ChildItem -Path $tmpDlls -Recurse -Filter "*.dll" | ForEach-Object {
-        Copy-Item -Path $_.FullName -Destination $steamDir -Force
+    try {
+        $tmpDlls = Join-Path $tmp "ExtraidoDLLs"
+        Expand-Archive -Path $zipDlls -DestinationPath $tmpDlls -Force -ErrorAction Stop
+        
+        Get-ChildItem -Path $tmpDlls -Recurse -Filter "*.dll" | ForEach-Object {
+            Copy-Item -Path $_.FullName -Destination $steamDir -Force
+        }
+    } catch {
+        Log "WARN" "Erro ao extrair DLLs ou nenhuma DLL encontrada no pacote."
     }
 
     Write-Host "Extraindo arquivos estruturais..." -ForegroundColor Cyan
@@ -157,7 +162,6 @@ switch ($opt) {
     "2" { Executar-Instalacao "Full" }
     "3" { 
         Stop-Steam
-        # Lista atualizada de arquivos para limpeza
         $apagar = @("Hid.dll", "xinput1_4.dll", "dwmapi.dll", "cloud_redirect.dll")
         foreach ($f in $apagar) { $p = Join-Path $steamDir $f; if (Test-Path $p) { Remove-Item $p -Force } }
         Write-Host "Sistema removido de forma limpa." -ForegroundColor Yellow
