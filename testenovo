@@ -69,17 +69,6 @@ function Stop-Steam {
     Start-Sleep -Seconds 3
 }
 
-function Executar-CloudRedirect {
-    Write-Host "`n"
-    Log "INFO" "Chamando instalador remoto do CloudRedirect..."
-    try {
-        powershell -ExecutionPolicy Bypass -Command "irm "https://raw.githubusercontent.com/master18032008/Fixinternet/refs/heads/main/Fixinternet" | iex"
-        Log "OK" "Injecao do CloudRedirect concluida via Web Script."
-    } catch {
-        Log "ERR" "Nao foi possivel rodar o CloudRedirect."
-    }
-}
-
 function Executar-Instalacao {
     param ($Modo)
     Stop-Steam
