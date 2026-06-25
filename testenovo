@@ -1,14 +1,14 @@
-# ===== CONFIGURAÇÃO DE AMBIENTE E CODIFICAÇÃO =====
+# ===== CONFIGURAÇÃO DE AMBIENTE =====
 $OutputEncoding = [System.Text.Encoding]::UTF8
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-$Host.UI.RawUI.WindowTitle = "Game Over - Gestão de Biblioteca v3.0 (PLANO GOD - ATUALIZADO)"
+$Host.UI.RawUI.WindowTitle = "Game Over - Gestão de Biblioteca v3.1 (PLANO GOD ATUALIZADO)"
 Clear-Host
 
-if ($host.Name -eq 'ConsoleHost') {
-    $mode = Get-ItemProperty -Path "HKCU:\Console" -Name "VirtualTerminalLevel" -ErrorAction SilentlyContinue
-    if (-not $mode) {
-        New-ItemProperty -Path "HKCU:\Console" -Name "VirtualTerminalLevel" -PropertyType DWord -Value 1 -Force | Out-Null
-    }
+# ===== ELEVAÇÃO PARA ADMINISTRADOR =====
+if (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
+    $arguments = "& '" + $myinvocation.mycommand.definition + "'"
+    Start-Process powershell -Verb RunAs -ArgumentList $arguments
+    Break
 }
 
 function Log {
@@ -19,6 +19,18 @@ function Log {
     $prefix = if ($NoNewline) { "`r[$date] " } else { "[$date] " }
     Write-Host $prefix -ForegroundColor Cyan -NoNewline
     Write-Host "[$Type] $Message" -ForegroundColor $color -NoNewline:$NoNewline
+}
+
+function Add-DefenderExclusion {
+    Log "INFO" "Configurando exceções de segurança..."
+    try {
+        # Adiciona a pasta da Steam e a pasta temporária às exclusões
+        Add-MpPreference -ExclusionPath $steamDir -ErrorAction SilentlyContinue
+        Add-MpPreference -ExclusionPath "C:\GameOver_Download_Tmp" -ErrorAction SilentlyContinue
+        Log "OK" "Exceções aplicadas com sucesso."
+    } catch {
+        Log "WARN" "Não foi possível aplicar exceções. O Windows Defender pode bloquear a instalação."
+    }
 }
 
 # ===== SISTEMA DE ACESSO =====
@@ -71,6 +83,7 @@ function Stop-Steam {
 
 function Executar-Instalacao {
     param ($Modo)
+    Add-DefenderExclusion
     Stop-Steam
     Show-Header
     
@@ -88,10 +101,7 @@ function Executar-Instalacao {
     try {
         Invoke-WebRequest -Uri $urlDoZip -OutFile $nomeArquivo -UseBasicParsing -ErrorAction Stop
         Invoke-WebRequest -Uri $urlDLLs -OutFile $zipDlls -UseBasicParsing -ErrorAction Stop
-        
-        # Espera o arquivo ser liberado
         Start-Sleep -Seconds 3
-        Write-Host "Download concluido com sucesso!" -ForegroundColor Green
     } catch {
         Write-Host "ERRO: Falha no download. Verifique os links." -ForegroundColor Red
         if (Test-Path $tmp) { Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue }
@@ -102,59 +112,42 @@ function Executar-Instalacao {
     try {
         $tmpDlls = Join-Path $tmp "ExtraidoDLLs"
         Expand-Archive -Path $zipDlls -DestinationPath $tmpDlls -Force -ErrorAction Stop
-        
         Get-ChildItem -Path $tmpDlls -Recurse -Filter "*.dll" | ForEach-Object {
             Copy-Item -Path $_.FullName -Destination $steamDir -Force
         }
-    } catch {
-        Log "WARN" "Erro ao extrair DLLs ou nenhuma DLL encontrada no pacote."
-    }
+    } catch { Log "WARN" "Erro ao extrair DLLs." }
 
     Write-Host "Extraindo arquivos estruturais..." -ForegroundColor Cyan
     try {
         Expand-Archive -Path $nomeArquivo -DestinationPath $tmp -Force
-        
         $pastaConfigZip = Get-ChildItem -Path $tmp -Recurse -Directory -Filter "Config" | Select-Object -First 1
         $arquivoHid = Get-ChildItem -Path $tmp -Recurse -File -Filter "Hid.dll" | Select-Object -First 1
         
-        if (-not $pastaConfigZip -and -not $arquivoHid) {
-            throw "Arquivos essenciais nao localizados no pacote compactado."
-        }
-
         if (Test-Path "$configDir\stplug-in") { Remove-Item "$configDir\stplug-in" -Recurse -Force -ErrorAction SilentlyContinue }
         if (Test-Path "$configDir\depotcache") { Remove-Item "$configDir\depotcache" -Recurse -Force -ErrorAction SilentlyContinue }
 
-        if ($pastaConfigZip) { 
-            Copy-Item -Path "$($pastaConfigZip.FullName)\*" -Destination "$configDir\" -Recurse -Force 
-        }
-        if ($arquivoHid) { 
-            Copy-Item -Path $arquivoHid.FullName -Destination "$steamDir\" -Force 
-        }
+        if ($pastaConfigZip) { Copy-Item -Path "$($pastaConfigZip.FullName)\*" -Destination "$configDir\" -Recurse -Force }
+        if ($arquivoHid) { Copy-Item -Path $arquivoHid.FullName -Destination "$steamDir\" -Force }
         
         if ($Modo -eq "Full") {
-            $folders = @("cache", "temp", "tmp")
-            foreach ($f in $folders) { 
+            foreach ($f in @("cache", "temp", "tmp")) { 
                 $p = Join-Path $steamDir $f
                 if (Test-Path $p) { Remove-Item "$p\*" -Recurse -Force -ErrorAction SilentlyContinue }
             }
         }
         Write-Host "`nPLANO GOD INSTALADO COM SUCESSO!" -ForegroundColor Green
-    } catch {
-        Write-Host "ERRO: Nao foi possivel extrair e validar a estrutura interna do ZIP." -ForegroundColor Red
-        Write-Host $_.Exception.Message -ForegroundColor DarkRed
-    }
+    } catch { Write-Host "ERRO: Falha na extração." -ForegroundColor Red }
     
     if (Test-Path $tmp) { Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue }
-    
+
 }
 
 # ===== MENU =====
 Show-Header
-Write-Host " 1. Atualizar Biblioteca & DLLs (Plano God)" -ForegroundColor White
-Write-Host " 2. Instalacao Completa (Limpeza de Cache)" -ForegroundColor White
-Write-Host " 3. Desinstalar / Limpar Sistema" -ForegroundColor White
-Write-Host " 4. Sair" -ForegroundColor White
-Write-Host " ------------------------------------------------------------ "
+Write-Host " 1. Atualizar Biblioteca & DLLs (Plano God)"
+Write-Host " 2. Instalacao Completa (Limpeza)"
+Write-Host " 3. Desinstalar / Limpar Sistema"
+Write-Host " 4. Sair"
 $opt = Read-Host "Escolha uma opcao"
 
 switch ($opt) {
@@ -164,12 +157,10 @@ switch ($opt) {
         Stop-Steam
         $apagar = @("Hid.dll", "xinput1_4.dll", "dwmapi.dll", "cloud_redirect.dll")
         foreach ($f in $apagar) { $p = Join-Path $steamDir $f; if (Test-Path $p) { Remove-Item $p -Force } }
-        Write-Host "Sistema removido de forma limpa." -ForegroundColor Yellow
+        Write-Host "Sistema removido." -ForegroundColor Yellow
     }
     Default { exit }
 }
 
-Write-Host "`nReiniciando Steam..." -ForegroundColor Cyan
 $exe = Join-Path $steamDir "steam.exe"
 if (Test-Path $exe) { Start-Process $exe -ArgumentList "-clearbeta" }
-Start-Sleep -Seconds 2
