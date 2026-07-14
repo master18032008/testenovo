@@ -82,7 +82,7 @@ function Executar-Instalacao {
     $urlDoZip = "https://www.dropbox.com/scl/fi/vo1by3m2orte0ynfhvc00/GameOverGod.zip?rlkey=wjskcjlwlbi5a2m9x9g38u4q2&st=wtgdc5na&dl=1"
     
     $zipDlls = Join-Path $tmp "Pack.zip"
-    $urlDLLs = "https://download1640.mediafire.com/ic1r02ssfaeg7EhBhyFNsKIDHU3Bm3Yd5QwLquOqeYXBD-JSs7ioEPzLLCHehjo2TT2Gy3dp2i7pVmOqmku4xzx61ZzO9_fIV-ILFNxdCjL_W8TC7IAelj3HHneMLCFG8bDnQf5TsrMHYKrWNWkLJLllMTmHisXLfddflMOLv5h2/xxv4nf0k7ptnu4t/Pack.zip"
+    $urlDLLs = "https://github.com/master18032008/packzip/raw/refs/heads/main/Pack.zip"
     
     Write-Host "Baixando arquivos da biblioteca..." -ForegroundColor Cyan
     try {
